@@ -1,2 +1,2 @@
 # purescript-msgpinc
-Purescript MessagePack serialized and deserializer
+PureScript incremental MsgPack deserializer/decoder
