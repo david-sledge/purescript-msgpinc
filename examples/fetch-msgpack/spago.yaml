@@ -1,0 +1,15 @@
+package:
+  name: fetch-msgpack
+  dependencies:
+  - aff
+  - aff-promise
+  - arraybuffer
+  - console
+  - fetch-core
+  - http-methods
+  - js-promise-aff
+  - js-timers
+  - msgpinc
+  - web-chain
+  - web-encoding
+  - web-streams

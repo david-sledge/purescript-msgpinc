@@ -1,0 +1,39 @@
+{
+  "private": true,
+  "scripts": {
+    "clean": "rimraf output && rimraf .spago && rimraf node_modules",
+    "postinstall": "spago install",
+    "node-version": "echo -n \"nodejs version: \" && node --version",
+    "npm-version": "echo -n \"npm version: \" && npm --version",
+    "esbuild-version": "echo -n \"esbuild version: \" && esbuild --version",
+    "psa-version": "echo -n \"purescript-psa version: \" && psa --version",
+    "purs-tidy-version": "echo -n \"purs-tidy version: \" && purs-tidy --version",
+    "purs-version": "echo -n \"purescript version: \" && purs --version",
+    "rimraf-version": "echo -n \"rimraf version: \" && rimraf --version",
+    "spago-version": "echo -n \"spago version: \" && spago --version",
+    "versions": "npm run -s node-version && npm run -s npm-version && npm run -s esbuild-version && npm run -s purs-version && npm run -s psa-version && npm run -s purs-tidy-version && npm run -s rimraf-version && npm run -s spago-version",
+    "build": "spago build -p msgpinc",
+    "format": "purs-tidy format-in-place src test",
+    "check-formatting": "purs-tidy check src test",
+    "test": "spago test",
+    "example-fetch-msgpack": "examples/bundle.sh fetch-msgpack",
+    "example-all": "npm run -s example-fetch-msgpack",
+    "launch-fetch-msgpack": "npm run -s example-fetch-msgpack && cd examples/fetch-msgpack/dist && firefox http://localhost:8080",
+    "publish": "spago publish -p msgpinc",
+    "ensure-ranges": "spago fetch --ensure-ranges",
+    "upgrade-package-set": "cp spago.yaml spago.yaml.bak && spago upgrade"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "http-server": "^14.1.1",
+    "inline-source-cli": "^2.0.0",
+    "purescript": "^0.15.16",
+    "purescript-psa": "^0.9.0",
+    "purs-tidy": "^0.11.1",
+    "rimraf": "^6.1.3",
+    "spago": "^1.0.4"
+  },
+  "dependencies": {
+    "npm": "^11.13.0"
+  }
+}
