@@ -6,6 +6,7 @@ import Control.MsgPinc.Decoder
 import Control.MsgPinc.Deserializer
 import Control.Monad.Error.Class (class MonadThrow)
 import Control.Monad.Except (throwError)
+import Control.Monad.Rec.Class (class MonadRec)
 import Data.Array (snoc)
 import Data.Either (Either(Left, Right))
 import Data.Identity (Identity(Identity))

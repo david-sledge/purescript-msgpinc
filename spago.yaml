@@ -1,6 +1,6 @@
 workspace:
   packageSet:
-    registry: 76.2.0
+    registry: 77.0.0
 package:
   dependencies:
     - aff: ">=8.0.0 <9.0.0"
@@ -38,7 +38,7 @@ package:
       - ImplicitQualifiedImportReExport
       - ImplicitQualifiedImport
     dependencies:
-      - spec
+      - spec-node
       - assert
       - debug
   publish:

@@ -5,7 +5,9 @@ module Control.MsgPinc.Deserializer
   , Event(..)
   , UnDeserialMsgPack
   , deserializeMsgPackStreamT
-  ) where
+  , initState
+  )
+  where
 
 import Prelude
 
@@ -25,6 +27,8 @@ import Data.Int64 (Int64)
 import Data.ListLike as L
 import Data.MsgPinc.Spec (fixarray, fixarrayMask, fixmap, fixmapMask, fixstr, fixstrMask, negFixint, negFixintMask, posFixint, posFixintMask)
 import Data.Serialize.Get (GetT, UnGet, getFloat32beT, getFloat64beT, getInt16beT, getInt32beT, getInt64beT, getInt8T, getUint16beT, getUint32beT, getUint64beT, getUint8T, processBytes, runGetT)
+import Data.Show (class Show)
+import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(Tuple), snd)
 import Data.UInt64 (UInt64)
 import Data.UInt as U
@@ -101,6 +105,9 @@ data DeserialState
   | DSExt ExtSubState DeserialState
   | DSMap MapSubState DeserialState
 
+initState :: DeserialState
+initState = DSRoot
+
 data DeserialError
   = UnusedByte
   | FlogTheDeveloper DeserialState
@@ -115,10 +122,10 @@ data Event
   | EUInt UInt
   | EUInt64 UInt64
   | EBinaryStart UInt
-  | EBinary DataView
+  | EBinary Uint8Array
   | EBinaryEnd
   | EExtStart UInt Int
-  | EExt DataView
+  | EExt Uint8Array
   | EExtEnd
   | EStringStart UInt
   | EString String
@@ -128,11 +135,18 @@ data Event
   | EMapStart UInt
   | EMapEnd
 
+-- derive instance eqEvent ∷ Eq Event
+-- derive instance ordEvent ∷ Ord Event
+-- derive instance genericEvent ∷ Generic Event _
+
+-- instance showEvent ∷ Show Event where
+--   show = genericShow
+
 type DeserialMsgPackT m = ExceptT Int (GetT DeserialError (Tuple DeserialState DataView) m)
 
 type UnDeserialMsgPack = UnGet DeserialError (Either Int Event) (Tuple DeserialState DataView)
 
-deserializeMsgPackStreamT :: forall m. MonadEffect m => MonadRec m => Partial => Tuple DeserialState DataView -> m UnDeserialMsgPack
+deserializeMsgPackStreamT :: forall m. MonadEffect m => MonadRec m => Tuple DeserialState DataView -> m UnDeserialMsgPack
 deserializeMsgPackStreamT =
   (runGetT <<< runExceptT)
     let
@@ -287,9 +301,9 @@ deserializeMsgPackStreamT =
                         ( \n -> do
                             let byteLen = D.byteLength dv
                             if byteLen == 0 then throwError n
-                            else EBinary dv <$ (put <<< Tuple (DSData dType (SSRead len $ read + U.fromInt byteLen) parentState) =<< L.empty)
+                            else (EBinary <$> dataToArray dv) <* (put <<< Tuple (DSData dType (SSRead len $ read + U.fromInt byteLen) parentState) =<< L.empty)
                         )
-                        (\dv' -> EBinary dv' <$ put (Tuple (DSData dType (SSRead len $ read + U.fromInt nextRead) parentState) dv))
+                        (\dv' -> (EBinary <$> dataToArray dv') <* put (Tuple (DSData dType (SSRead len $ read + U.fromInt nextRead) parentState) dv))
                         mA
               DTString decoder →
                 case subState of
@@ -363,9 +377,9 @@ deserializeMsgPackStreamT =
                     ( \n -> do
                         let byteLen = D.byteLength dv
                         if byteLen == 0 then throwError n
-                        else EExt dv <$ (put <<< Tuple (DSExt (ESRead len $ read + U.fromInt byteLen) parentState) =<< L.empty)
+                        else (EExt <$> dataToArray dv) <* (put <<< Tuple (DSExt (ESRead len $ read + U.fromInt byteLen) parentState) =<< L.empty)
                     )
-                    (\dv' -> EExt dv' <$ put (Tuple (DSExt (ESRead len $ read + U.fromInt nextRead) parentState) dv))
+                    (\dv' -> (EExt <$> dataToArray dv') <* put (Tuple (DSExt (ESRead len $ read + U.fromInt nextRead) parentState) dv))
                     mA
           DSNumber numType parentState →
             let

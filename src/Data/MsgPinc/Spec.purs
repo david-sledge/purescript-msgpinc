@@ -1,9 +1,9 @@
 {-|
 Module      : Data.MessagePack.Spec
 Description : Message Pack specification values
-Copyright   : (c) Rodrigo Setti, 2014
+Copyright   : (c) David M. Sledge, 2026
 License     : MIT
-Maintainer  : rodrigosetti@gmail.com
+Maintainer  : sledged@gmail.com
 Stability   : experimental
 Portability : portable
 
