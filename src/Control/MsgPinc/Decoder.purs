@@ -1,6 +1,6 @@
 module Control.MsgPinc.Decoder where
 
-import Prelude
+import Prelude (bind, discard, pure, ($), (*>), (<<<))
 
 import Control.MsgPinc.Deserializer
 import Control.Monad.Error.Class (class MonadThrow)

@@ -1,9 +1,17 @@
 module Control.MsgPinc.Deserializer
-  ( DeserialError(..)
+  ( BitSize(..)
+  , DataSize(..)
+  , DataType(..)
+  , DeserialError(..)
   , DeserialMsgPackT
   , DeserialState
   , Event(..)
+  , ExtSubState(..)
+  , MapSubState(..)
+  , NumberType(..)
+  , SubState(..)
   , UnDeserialMsgPack
+  , caseDeserialState
   , deserializeMsgPackStreamT
   , initState
   )
@@ -27,8 +35,6 @@ import Data.Int64 (Int64)
 import Data.ListLike as L
 import Data.MsgPinc.Spec (fixarray, fixarrayMask, fixmap, fixmapMask, fixstr, fixstrMask, negFixint, negFixintMask, posFixint, posFixintMask)
 import Data.Serialize.Get (GetT, UnGet, getFloat32beT, getFloat64beT, getInt16beT, getInt32beT, getInt64beT, getInt8T, getUint16beT, getUint32beT, getUint64beT, getUint8T, processBytes, runGetT)
-import Data.Show (class Show)
-import Data.Show.Generic (genericShow)
 import Data.Tuple (Tuple(Tuple), snd)
 import Data.UInt64 (UInt64)
 import Data.UInt as U
@@ -104,6 +110,15 @@ data DeserialState
   | DSData DataType SubState DeserialState
   | DSExt ExtSubState DeserialState
   | DSMap MapSubState DeserialState
+
+caseDeserialState :: forall s. s -> (NumberType -> DeserialState -> s) -> (DataType -> SubState -> DeserialState -> s) -> (ExtSubState -> DeserialState -> s) -> (MapSubState -> DeserialState -> s) -> DeserialState -> s
+caseDeserialState root numbr dat ext maap desState =
+  case desState of
+  DSRoot -> root
+  DSNumber numberType parentState -> numbr numberType parentState
+  DSData dataType subState parentState -> dat dataType subState parentState
+  DSExt extSubState parentState -> ext extSubState parentState
+  DSMap mapSubState parentState -> maap mapSubState parentState
 
 initState :: DeserialState
 initState = DSRoot
@@ -205,7 +220,7 @@ deserializeMsgPackStreamT =
               -- false
               0xc2 → EBool false <$ stateTransitionFromEndValue deserialState
               -- true
-              0xc3 → EBool false <$ stateTransitionFromEndValue deserialState
+              0xc3 → EBool true <$ stateTransitionFromEndValue deserialState
               -- bin8
               0xc4 → putDeserialState (DSData DTBinary (SSLength Data8) deserialState) *> deserialize
               -- bin16
