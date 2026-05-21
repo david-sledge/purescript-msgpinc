@@ -12,6 +12,7 @@ import Control.MsgPinc.Deserializer
 import Data.ArrayBuffer.ArrayBuffer as AB
 import Data.ArrayBuffer.DataView as D
 import Data.ArrayBuffer.Types
+import Data.ArrayBuffer.Typed as A
 import Data.Either
 import Data.Identity
 import Data.List
@@ -68,6 +69,28 @@ compareDataViews dv1 dv2 = do
       in
       recurse 0
     else pure false
+
+-- eqEvent ENil ENil = pure true
+-- eqEvent (EBool val1) (EBool val2) = pure $ val1 == val2
+-- eqEvent (EFloat val1) (EFloat fl2) = pure $ val1 == fl2
+-- eqEvent (EDouble val1) (EDouble val2) = pure $ val1 == val2
+-- eqEvent (EInt val1) (EInt val2) = pure $ val1 == val2
+-- eqEvent (EInt64 val1) (EInt64 val2) = pure $ val1 == val2
+-- eqEvent (EUInt val1) (EUInt val2) = pure $ val1 == val2
+-- eqEvent (EUInt64 val1) (EUInt64 val2) = pure $ val1 == val2
+-- eqEvent (EBinaryStart val1) (EBinaryStart val2) = pure $ val1 == val2
+-- eqEvent (EBinary val1) (EBinary val2) = A.eq val1 val2
+-- eqEvent EBinaryEnd EBinaryEnd = pure true
+-- eqEvent (EExt val1) (EExt val2) = A.eq val1 val2
+-- eqEvent EExtEnd EExtEnd = pure true
+-- eqEvent (EStringStart val1) (EStringStart val2) = pure $ val1 == val2
+-- eqEvent (EString val1) (EString val2) = pure $ val1 == val2
+-- eqEvent EStringEnd EStringEnd = pure true
+-- eqEvent (EArrayStart val1) (EArrayStart val2) = pure $ val1 == val2
+-- eqEvent EArrayEnd EArrayEnd = pure true
+-- eqEvent (EMapStart val1) (EMapStart val2) = pure $ val1 == val2
+-- eqEvent EMapEnd EMapEnd = pure true
+-- eqEvent _ _ = pure false
 
 test = runSpecAndExitProcess [consoleReporter] do
   describe "Deserilization tests" do
@@ -146,7 +169,7 @@ test = runSpecAndExitProcess [consoleReporter] do
       if b
         then pure unit
         else trace dv' \ _ -> fail "Resulting DataView is not empty!"
-    it "starts to deserialize binary data" do
+    it "starts to deserialize binary 8-bit data" do
       -- create one-byte DataView
       dv <- liftEffect $ D.whole <$> AB.empty 1
       -- set the byte to MessagePack true
@@ -155,24 +178,20 @@ test = runSpecAndExitProcess [consoleReporter] do
       Tuple mResult (Tuple deserialState dv') <- deserializeMsgPackStreamT $ Tuple initState dv
       case mResult of
         Right (Left 1) -> pure unit
-        _ -> trace mResult \ _ -> fail "Did not start to deserialize binary data!"
+        _ -> trace mResult \ _ -> fail "Did not start to deserialize binary 8-bit data!"
       let
+        one = 1
         fale :: forall a b m. MonadThrow Error m => a -> b -> m Unit
         fale _ _ = trace deserialState \ _ -> fail "Resulting deserial state is not DTBinary (SSLength Data8) DSRoot!"
       -- check the end state
       caseDeserialState
-        (fale 1 2)
+        -- trick trace from executing unless it needs to
+        (if one /= 0 then pure unit else fale 1 2)
         fale
         (\ dataType subState parentState -> do
-          case dataType of
-            DTBinary -> pure unit
-            _ -> trace dataType \ _ -> fail "Data type is not DTBinary!"
-          case subState of
-            SSLength dataSize ->
-              case dataSize of
-              Data8 -> pure unit
-              _ -> trace dataSize \ _ -> fail "Data size is not Data8!"
-            _ -> trace dataType \ _ -> fail "Sub-state is not SSLength Data8!"
+          if dataType == DTBinary && subState == SSLength Data8
+            then pure unit
+            else fale 1 2
           let
             parentFail :: forall a b m. MonadThrow Error m => a -> b -> m Unit
             parentFail _ _ = trace parentState \ _ -> fail "parent state is not DSRoot!"

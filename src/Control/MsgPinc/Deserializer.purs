@@ -85,6 +85,12 @@ data DataType
   | DTBinary
   | DTArray
 
+instance eqDataType :: Eq DataType where
+  eq (DTString _) (DTString _) = true
+  eq DTBinary DTBinary = true
+  eq DTArray DTArray = true
+  eq _ _ = false
+
 data ExtSubState
   = ESLength DataSize
   | ESType UInt
@@ -110,6 +116,8 @@ data DeserialState
   | DSData DataType SubState DeserialState
   | DSExt ExtSubState DeserialState
   | DSMap MapSubState DeserialState
+
+derive instance eqDeserialState ∷ Eq DeserialState
 
 caseDeserialState :: forall s. s -> (NumberType -> DeserialState -> s) -> (DataType -> SubState -> DeserialState -> s) -> (ExtSubState -> DeserialState -> s) -> (MapSubState -> DeserialState -> s) -> DeserialState -> s
 caseDeserialState root numbr dat ext maap desState =
