@@ -169,29 +169,60 @@ test = runSpecAndExitProcess [consoleReporter] do
       if b
         then pure unit
         else trace dv' \ _ -> fail "Resulting DataView is not empty!"
-    it "starts to deserialize binary 8-bit data" do
-      -- create one-byte DataView
-      dv <- liftEffect $ D.whole <$> AB.empty 1
-      -- set the byte to MessagePack true
-      void <<< liftEffect <<< D.setUint8 dv 0 $ U.fromInt bin8
-      -- deserialize the DataView contents
-      Tuple mResult (Tuple deserialState dv') <- deserializeMsgPackStreamT $ Tuple initState dv
-      case mResult of
-        Right (Left 1) -> pure unit
-        _ -> trace mResult \ _ -> fail "Did not start to deserialize binary 8-bit data!"
-      let
-        one = 1
-        fale :: forall a b m. MonadThrow Error m => a -> b -> m Unit
-        fale _ _ = trace deserialState \ _ -> fail "Resulting deserial state is not DTBinary (SSLength Data8) DSRoot!"
-      -- check the end state
-      caseDeserialState
-        -- trick trace from executing unless it needs to
-        (if one /= 0 then pure unit else fale 1 2)
-        fale
-        (\ dataType subState parentState -> do
+    let
+      itTest description len leadByte askByteLen resStateDesc handler =
+        it description do
+          -- create one-byte DataView
+          dv <- liftEffect $ D.whole <$> AB.empty len
+          -- set the byte to MessagePack true
+          void <<< liftEffect <<< D.setUint8 dv 0 $ U.fromInt leadByte
+          -- deserialize the DataView contents
+          Tuple mResult (Tuple deserialState dv') <- deserializeMsgPackStreamT $ Tuple initState dv
+          case mResult of
+            Right (Left askByteLen) -> pure unit
+            _ -> trace mResult \ _ -> fail $ "Did not ask for " <> show askByteLen <> " more byte(s) of data!"
+          let
+            one = 1
+            fale :: forall a b m. MonadThrow Error m => a -> b -> m Unit
+            fale _ _ = trace deserialState \ _ -> fail $ "Resulting deserial state is not " <> resStateDesc <> "!"
+          -- check the end state
+          caseDeserialState
+            -- trick trace from executing unless it needs to
+            (case handler of
+              Root -> pure unit
+              _ -> fale 1 2
+            )
+            (case handler of
+              Num f -> f
+              _ -> fale
+            )
+            (case handler of
+              Dat f -> f
+              _ -> \ _ -> fale
+            )
+            (case handler of
+              Ext f -> f
+              _ -> fale
+            )
+            (case handler of
+              Maap f -> f
+              _ -> fale
+            )
+            deserialState
+          b <- liftEffect $ compareDataViews dv' =<< L.empty
+          if b
+            then pure unit
+            else trace dv' \ _ -> fail "Resulting DataView is not empty!"
+    itTest
+      "starts to deserialize binary 8-bit data (lenth is specified in an 8-bit word)"
+      1
+      bin8
+      1
+      "DTBinary (SSLength Data8) DSRoot"
+      $ Dat \ dataType subState parentState -> do
           if dataType == DTBinary && subState == SSLength Data8
             then pure unit
-            else fale 1 2
+            else fail "Resulting deserial state is not DTBinary (SSLength Data8) DSRoot!"
           let
             parentFail :: forall a b m. MonadThrow Error m => a -> b -> m Unit
             parentFail _ _ = trace parentState \ _ -> fail "parent state is not DSRoot!"
@@ -202,11 +233,50 @@ test = runSpecAndExitProcess [consoleReporter] do
             parentFail
             parentFail
             parentState
-        )
-        fale
-        fale
-        deserialState
-      b <- liftEffect $ compareDataViews dv' =<< L.empty
-      if b
-        then pure unit
-        else trace dv' \ _ -> fail "Resulting DataView is not empty!"
+    itTest
+      "starts to deserialize binary 8-bit data (lenth is specified in an 16-bit word)"
+      1
+      bin16
+      2
+      "DTBinary (SSLength Data16) DSRoot"
+      $ Dat \ dataType subState parentState -> do
+          if dataType == DTBinary && subState == SSLength Data16
+            then pure unit
+            else fail "Resulting deserial state is not DTBinary (SSLength Data16) DSRoot!"
+          let
+            parentFail :: forall a b m. MonadThrow Error m => a -> b -> m Unit
+            parentFail _ _ = trace parentState \ _ -> fail "parent state is not DSRoot!"
+          caseDeserialState
+            (pure unit)
+            parentFail
+            (\ _ -> parentFail)
+            parentFail
+            parentFail
+            parentState
+    itTest
+      "starts to deserialize binary 8-bit data (lenth is specified in an 32-bit word)"
+      1
+      bin32
+      4
+      "DTBinary (SSLength Data32) DSRoot"
+      $ Dat \ dataType subState parentState -> do
+          if dataType == DTBinary && subState == SSLength Data32
+            then pure unit
+            else fail "Resulting deserial state is not DTBinary (SSLength Data32) DSRoot!"
+          let
+            parentFail :: forall a b m. MonadThrow Error m => a -> b -> m Unit
+            parentFail _ _ = trace parentState \ _ -> fail "parent state is not DSRoot!"
+          caseDeserialState
+            (pure unit)
+            parentFail
+            (\ _ -> parentFail)
+            parentFail
+            parentFail
+            parentState
+
+data StateHandler m
+  = Root
+  | Num (NumberType -> DeserialState -> m Unit)
+  | Dat (DataType -> SubState -> DeserialState -> m Unit)
+  | Ext (ExtSubState -> DeserialState -> m Unit)
+  | Maap (MapSubState -> DeserialState -> m Unit)
