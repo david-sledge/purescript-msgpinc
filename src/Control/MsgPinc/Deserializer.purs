@@ -219,7 +219,7 @@ deserializeMsgPackStreamT =
               mA
           strDeserSt subState = do
             decoder ← liftEffect $ new utf8
-            putDeserialState (DSData (DTString decoder) subState deserialState) *> deserialize
+            putDeserialState (DSData (DTString decoder) subState deserialState)
           valueStart = do
             uint8 <- next getUint8T
             case U.toInt uint8 of
@@ -272,11 +272,11 @@ deserializeMsgPackStreamT =
               -- fixext16
               0xd8 → putDeserialState (DSExt (ESType $ U.fromInt 16) deserialState) *> deserialize
               -- str8
-              0xd9 → strDeserSt $ SSLength Data8
+              0xd9 → strDeserSt (SSLength Data8) *> deserialize
               -- str16
-              0xda → strDeserSt $ SSLength Data16
+              0xda → strDeserSt (SSLength Data16) *> deserialize
               -- str32
-              0xdb → strDeserSt $ SSLength Data32
+              0xdb → strDeserSt (SSLength Data32) *> deserialize
               -- array16
               0xdc → putDeserialState (DSData DTArray (SSLength Data16) deserialState) *> deserialize
               -- array32
@@ -287,11 +287,22 @@ deserializeMsgPackStreamT =
               0xdf → putDeserialState (DSMap (MSLength Data32) deserialState) *> deserialize
               -- the rest
               byte →
-                if byte .&. posFixintMask == posFixint then pure $ EInt byte
-                else if byte .&. negFixintMask == negFixint then pure <<< EInt $ byte - 256
-                else if byte .&. fixstrMask == fixstr then strDeserSt <<< SSRead (U.fromInt $ byte .&. complement fixstrMask) $ U.fromInt 0
-                else if byte .&. fixarrayMask == fixarray then putDeserialState (DSData DTArray (SSRead (U.fromInt $ byte .&. complement fixarrayMask) $ U.fromInt 0) deserialState) *> deserialize
-                else if byte .&. fixmapMask == fixmap then putDeserialState (DSMap (MSRead (U.fromInt $ byte .&. complement fixmapMask) false $ U.fromInt 0) deserialState) *> deserialize
+                if byte .&. posFixintMask == posFixint
+                  then pure $ EInt byte
+                else if byte .&. negFixintMask == negFixint
+                  then pure <<< EInt $ byte - 256
+                else if byte .&. fixstrMask == fixstr
+                  then
+                    let len = U.fromInt $ byte .&. complement fixstrMask in
+                    EStringStart len <$ strDeserSt (SSRead len $ U.fromInt 0)
+                else if byte .&. fixarrayMask == fixarray
+                  then
+                    let len = U.fromInt $ byte .&. complement fixarrayMask in
+                    EArrayStart len <$ putDeserialState (DSData DTArray (SSRead len $ U.fromInt 0) deserialState)
+                else if byte .&. fixmapMask == fixmap
+                  then
+                    let len = U.fromInt $ byte .&. complement fixmapMask in
+                    EMapStart len <$ putDeserialState (DSMap (MSRead len false $ U.fromInt 0) deserialState)
                 else throwDeserialError UnusedByte
           getteryGen m stateF resK = do
             uint <- next m

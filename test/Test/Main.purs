@@ -5,43 +5,33 @@ module Test.Main
 
 import Prelude
 
-import Control.Monad.Error.Class (class MonadThrow)
-import Control.Monad.Reader
-import Control.Monad.Rec.Class
-import Control.Monad.State
-import Control.MsgPinc.Deserializer
+import Control.MsgPinc.Deserializer (BitSize(..), DataSize(..), DataType(..), DeserialError(..), Event(..), ExtSubState(..), MapSubState(..), NumberType(..), SubState(..), caseDeserialState, deserializeMsgPackStreamT, initState)
 import Data.ArrayBuffer.ArrayBuffer as AB
 import Data.ArrayBuffer.DataView as D
-import Data.ArrayBuffer.Types
 import Data.ArrayBuffer.Typed as A
-import Data.Either
-import Data.Identity
-import Data.List
+import Data.ArrayBuffer.Types (DataView)
+import Data.Either (Either(Left, Right))
 import Data.ListLike as L
-import Data.MsgPinc.Spec
-import Data.Tuple
+import Data.MsgPinc.Spec (array16, array32, bin16, bin32, bin8, ext16, ext32, ext8, fals, fixarray, fixext1, fixext16, fixext2, fixext4, fixext8, fixmap, fixstr, float32, float64, int16, int32, int64, int8, map16, map32, nil, posFixint, str16, str32, str8, tru, uint16, uint32, uint64, uint8)
+import Data.Tuple (Tuple(Tuple))
 import Data.UInt as U
 import Data.UInt (UInt)
 import Debug (trace)
-import Effect
-import Effect.Class
-import Effect.Class.Console (log)
-import Effect.Exception (Error)
-import Test.Spec
-import Test.Spec.Assertions
-import Effect.Aff (launchAff_, delay)
-import Test.Spec (pending, describe, it)
-import Test.Spec.Assertions (shouldEqual)
+import Effect (Effect)
+import Effect.Class (class MonadEffect, liftEffect)
+import Test.Spec.Assertions (fail)
+import Test.Spec (describe, it)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner.Node (runSpecAndExitProcess)
-import Web.Encoding.TextDecoder (TextDecoder, new, decodeWithOptions)
+import Web.Encoding.TextDecoder (new)
 import Web.Encoding.UtfLabel (utf8)
-import Data.Int.Bits (complement, (.|.))
+import Data.Int.Bits ((.|.))
 
 main ∷ Effect Unit
 main = do
   test
 
+compareDataViews :: DataView -> DataView -> Effect Boolean
 compareDataViews dv1 dv2 = do
   let byteLen = D.byteLength dv1
   if D.byteLength dv2 == byteLen
@@ -75,6 +65,7 @@ compareDataViews dv1 dv2 = do
       recurse 0
     else pure false
 
+eqEvent :: forall f. Applicative f => MonadEffect f => Event -> Event -> f Boolean
 eqEvent ENil ENil = pure true
 eqEvent (EBool val1) (EBool val2) = pure $ val1 == val2
 eqEvent (EFloat val1) (EFloat fl2) = pure $ val1 == fl2
@@ -97,6 +88,7 @@ eqEvent (EMapStart val1) (EMapStart val2) = pure $ val1 == val2
 eqEvent EMapEnd EMapEnd = pure true
 eqEvent _ _ = pure false
 
+eqNestEither :: forall f a. Applicative f => Eq a => MonadEffect f => Either DeserialError (Either a Event) -> Either DeserialError (Either a Event) -> f Boolean
 eqNestEither (Left UnusedByte) (Left UnusedByte) = pure true
 eqNestEither (Right (Left n1)) (Right (Left n2)) = pure $ n1 == n2
 eqNestEither (Right (Right event1)) (Right (Right event2)) = eqEvent event1 event2
@@ -114,10 +106,11 @@ data StateExpectation
   | Ext ExtSubState ParentStateExpectation
   | Maap MapSubState ParentStateExpectation
 
+test :: Effect Unit
 test = do
   decoder ← new utf8
   runSpecAndExitProcess [consoleReporter] do
-    describe "Deserilization tests" do
+    describe "Deserilization start tests" do
       let
         parentStateTest parentStateExpectation deserialState =
           let
@@ -415,18 +408,75 @@ test = do
         0xc1
         (Left UnusedByte)
         "DSRoot"
-        $ Root
+        Root
       itTest
         "deserializes a fixint value"
         1
         (posFixint .|. 42)
         (Right <<< Right $ EInt 42)
         "DSRoot"
-        $ Root
+        Root
       itTest
         "deserializes a negative fixint value"
         1
-        (0xe0)
+        0xe0
         (Right <<< Right $ EInt (-32))
         "DSRoot"
-        $ Root
+        Root
+      let len = U.fromInt 1
+      itTest
+        "starts to deserializes a fixmap"
+        1
+        (fixmap .|. 1)
+        (Right <<< Right $ EMapStart len)
+        "MSRead 1 false 0"
+        $ Maap (MSRead len false $ U.fromInt 0) PRoot
+      itTest
+        "starts to deserializes a fixarray"
+        1
+        (fixarray .|. 1)
+        (Right <<< Right $ EArrayStart len)
+        "DTArray (MSRead 1 false 0)"
+        $ Dat DTArray (SSRead len $ U.fromInt 0) PRoot
+      itTest
+        "starts to deserializes a fixstr"
+        1
+        (fixstr .|. 1)
+        (Right <<< Right $ EStringStart len)
+        "DTString (MSRead 1 false 0)"
+        $ Dat (DTString decoder) (SSRead len $ U.fromInt 0) PRoot
+      itTest
+        "starts to deserializes a fixext1"
+        1
+        fixext1
+        (Right $ Left 1)
+        "(ESType 1) DSRoot"
+        $ Ext (ESType len) PRoot
+      itTest
+        "starts to deserializes a fixext2"
+        1
+        fixext2
+        (Right $ Left 1)
+        "(ESType 2) DSRoot"
+        $ Ext (ESType $ U.fromInt 2) PRoot
+      itTest
+        "starts to deserializes a fixext4"
+        1
+        fixext4
+        (Right $ Left 1)
+        "(ESType 4) DSRoot"
+        $ Ext (ESType $ U.fromInt 4) PRoot
+      itTest
+        "starts to deserializes a fixext8"
+        1
+        fixext8
+        (Right $ Left 1)
+        "(ESType 8) DSRoot"
+        $ Ext (ESType $ U.fromInt 8) PRoot
+      itTest
+        "starts to deserializes a fixext16"
+        1
+        fixext16
+        (Right $ Left 1)
+        "(ESType 16) DSRoot"
+        $ Ext (ESType $ U.fromInt 16) PRoot
