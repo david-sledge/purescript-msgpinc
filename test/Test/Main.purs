@@ -264,3 +264,38 @@ test = runSpecAndExitProcess [consoleReporter] do
       (Right $ Left 4)
       "DTBinary (SSLength Data32) DSRoot"
       $ Dat DTBinary (SSLength Data32) PRoot
+    itTest
+      "starts to deserialize ext 8-bit data (lenth is specified in an 8-bit word)"
+      1
+      ext8
+      (Right $ Left 1)
+      "DSExt (ESLength Data8) DSRoot"
+      $ Ext (ESLength Data8) PRoot
+    itTest
+      "starts to deserialize ext 8-bit data (lenth is specified in an 16-bit word)"
+      1
+      ext16
+      (Right $ Left 2)
+      "DSExt (ESLength Data16) DSRoot"
+      $ Ext (ESLength Data16) PRoot
+    itTest
+      "starts to deserialize ext 8-bit data (lenth is specified in an 32-bit word)"
+      1
+      ext32
+      (Right $ Left 4)
+      "DSExt (ESLength Data32) DSRoot"
+      $ Ext (ESLength Data32) PRoot
+    itTest
+      "starts to deserialize 32-bit float"
+      1
+      float32
+      (Right $ Left 4)
+      "DTNumber NFloat DSRoot"
+      $ Num NFloat PRoot
+    itTest
+      "starts to deserialize 64-bit float"
+      1
+      float64
+      (Right $ Left 8)
+      "DTNumber NDouble DSRoot"
+      $ Num NDouble PRoot

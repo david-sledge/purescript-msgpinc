@@ -145,7 +145,7 @@ getFloat32leT :: forall m226. MonadState DataView m226 => MonadEffect m226 => Mo
 getFloat32leT = bridge 4 D.getFloat32le
 
 getFloat64beT :: forall m226. MonadState DataView m226 => MonadEffect m226 => MonadRec m226 => MonadThrow Int m226 => m226 Number
-getFloat64beT = bridge 4 D.getFloat64be
+getFloat64beT = bridge 8 D.getFloat64be
 
 getFloat64leT :: forall m226. MonadState DataView m226 => MonadEffect m226 => MonadRec m226 => MonadThrow Int m226 => m226 Number
-getFloat64leT = bridge 4 D.getFloat64le
+getFloat64leT = bridge 8 D.getFloat64le
